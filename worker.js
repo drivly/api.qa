@@ -14,9 +14,14 @@ export const api = {
   repo: 'https://github.com/drivly/api.qa',
 }
 
-export const gettingStarted = {
-  
-}
+export const gettingStarted = [
+  '   _____ __________.___     ________      _____   ',
+  '  /  _  \\______   \   |    \_____  \    /  _  \  ',
+  ' /  /_\  \|     ___/   |     /  / \  \  /  /_\  \ ',
+  '/    |    \    |   |   |    /   \_/.  \/    |    \',
+  '\____|__  /____|   |___| /\ \_____\ \_/\____|__  /',
+  '        \/               \/        \__>        \/ ',
+]
 
 export const examples = {
   'lodash.do': 'https://api.qa/lodash.do/api'
