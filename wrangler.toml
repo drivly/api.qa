@@ -1,4 +1,4 @@
-name = "api.qa"
+name = "api-qa"
 route = { pattern = "*/*", zone_name = "api.qa" }
 main = "worker.js"
 compatibility_date = "2022-09-25"
