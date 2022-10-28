@@ -23,28 +23,6 @@ You can discover the API at <https://api.qa/api>
   "gettingStarted": {},
   "examples": {
     "lodash.do": "https://api.qa/lodash.do/api"
-  },
-  "user": {
-    "authenticated": false,
-    "plan": "🛠 Build",
-    "browser": "Safari",
-    "os": "Mac OS",
-    "ip": "76.156.0.116",
-    "isp": "Comcast Cable",
-    "flag": "🇺🇸",
-    "zipcode": "55379",
-    "city": "Shakopee",
-    "metro": "Minneapolis-St. Paul",
-    "region": "Minnesota",
-    "country": "United States",
-    "continent": "North America",
-    "requestId": "75172e199d802c80-ORD",
-    "localTime": "9/27/2022, 4:02:24 PM",
-    "timezone": "America/Chicago",
-    "edgeLocation": "Chicago",
-    "edgeDistanceMiles": 342,
-    "latencyMilliseconds": 44,
-    "recentInteractions": 1
   }
 }
 ```
