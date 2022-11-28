@@ -2,6 +2,7 @@ name = "api-qa"
 # route = { pattern = "*/*", zone_name = "api.qa" }
 main = "worker.js"
 compatibility_date = "2022-09-25"
+logpush = true
 
 services = [
   { binding = "CTX", service = "ctx-do", environment = "production" }
