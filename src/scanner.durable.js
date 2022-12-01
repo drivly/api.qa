@@ -109,15 +109,25 @@ export class ScannerDurable {
         await this.log(`Checking what type of root page ${domain} has`)
 
         let check
+        let r
         try {
-          check = await fetch(
+          r = await fetch(
             `https://${domain}/`
-          ).then(res => res.text())
+          )
+
+          check = await check.text()
         } catch (e) {
           check = '{}'
         }
         
-        return { test_name: 'landingPage', result: check.includes('<html') }
+        return {
+          test_name: 'landingPage',
+          result: check.includes('<html') && r.status == 200,
+          fix: [
+            `https://github.com/drivly/${domain}/new/main?filename=CNAME&value=${domain}`,
+            `https://github.com/drivly/${domain}/new/main?filename=_config.yaml&value=remote_theme%3A%20drivly%2Fdocs%0Aicon%3A%20%F0%9F%9A%80`
+          ]
+        }
       },
       async () => {
         // Check if the `/api` route exists
@@ -138,6 +148,29 @@ export class ScannerDurable {
           result: !(check?.api?.description || '').includes('Template'),
           fix: `https://github.com/drivly/${domain}/blob/main/worker.js`
         }
+      },
+      async () => {
+        // Check if /login routes to the OAuth login page.
+        await this.log(`Checking if ${domain}/login routes to the OAuth login page`)
+
+        let check
+
+        try {
+          check = await fetch(
+            `https://${domain}/login`,
+            {
+              redirect: 'manual'
+            }
+          )
+        } catch (e) {
+          check = ''
+        }
+        
+        return {
+          test_name: 'loginRedirect',
+          result: (check.headers.get('Location') || '').includes('oauth.do'),
+          fix: `https://dash.cloudflare.com/b6641681fe423910342b9ffa1364c76d/${domain}/workers`
+        }
       }
     ]
 
@@ -156,6 +189,7 @@ export class ScannerDurable {
     return {
       domain,
       lastChecked: new Date().toISOString(),
+      repo: `https://github.com/drivly/${domain}`,
       text: `${ emoji } ${domain} passed ${passed_checks}/${ report.flat().length } checks`,
       passed: report.flat().filter(x => x.result).map(x => x.test_name),
       problems: report.flat().filter(x => !x.result).reduce((acc, cur) => { acc[cur.test_name] = { result: cur.result, fix: cur.fix }; return acc }, {}),
@@ -180,6 +214,12 @@ export class ScannerDurable {
       }
 
       return new Response(JSON.stringify(report))
+    }
+
+    if (segments[1] == 'purge') {
+      await this.state.storage.delete(`${this.current_date()}:report`)
+
+      return new Response('ok')
     }
 
     return new Response('woof')

@@ -50,7 +50,7 @@ export default {
       })
     }
 
-    if (pathSegments[1] == 'list') {
+    if (pathSegments[1] == 'purge') {
       const domain_list = await fetch('https://cdn.jsdelivr.net/gh/drivly/apis.do/_data/domains.csv').then(res => res.text())
 
       // Parse CSV
@@ -63,19 +63,48 @@ export default {
       const get_report = async (domain) => {
         const scanner = await env.ScannerDurable.get(env.ScannerDurable.idFromName(domain))
 
-        const report = await scanner.fetch(`https://x.do/${domain}/report`).then(res => res.json())
+        const report = await scanner.fetch(`https://x.do/${domain}/purge`)
 
-        report.link = `https://${hostname}/api/${domain}/report`
-
-        return report
+        return true
       }
 
       return json({
         api,
         data: {
-          next: `https://${hostname}/api/list?offset=${offset + limit}&limit=${limit}`,
-          domains: await Promise.all(domains.slice(offset, offset + limit).map(get_report)),
+          domains: await Promise.all(domains.map(get_report)),
         },
+      })
+    }
+
+    if (pathSegments[1] == 'list') {
+      const domain_list = await fetch('https://cdn.jsdelivr.net/gh/drivly/apis.do/_data/domains.csv').then(res => res.text())
+
+      // Parse CSV
+      const domains = domain_list.split('\n').filter(x => !!x)
+
+      const offset = parseInt(query.offset) || 0
+      const limit = parseInt(query.limit) || 50
+      const search = query.search || ''
+      const simple = !!(query.simple || false)
+
+      const get_report = async (domain) => {
+        const scanner = await env.ScannerDurable.get(env.ScannerDurable.idFromName(domain))
+
+        const report = await scanner.fetch(`https://x.do/${domain}/report`).then(res => res.json())
+
+        report.link = `https://${hostname}/api/${domain}/report`
+
+        return simple ? report.text : report
+      }
+
+      return json({
+        api,
+        data: {
+          next: `https://${hostname}/api/list?offset=${offset + limit}&limit=${limit}&search=${search}`,
+          totalDomains: domains.filter(x => x.includes(search)).length,
+          domains: await Promise.all(domains.filter(x => x.includes(search)).slice(offset, offset + limit).map(get_report)),
+        },
+        user
       })
     }
 
