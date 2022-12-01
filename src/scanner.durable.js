@@ -8,7 +8,7 @@ export class ScannerDurable {
       console.log(message)
 
       await fetch(
-        `https://websockets.do/time-series-do/emit?log=${message}&from=scheduler`
+        `https://websockets.do/apis-qa-scanner/emit?log=${message}&from=scanner`
       )
     }
   }
@@ -192,13 +192,65 @@ export class ScannerDurable {
 
     const emoji = passed_checks == report.flat().length ? '✅' : passed_checks > report.flat().length / 2 ? '🆗' : '❌'
 
+    let api_spec
+
+    try {
+      api_spec = await fetch(
+        `https://${domain}/api`
+      ).then(res => res.json())
+    } catch (e) {
+      api_spec = { examples: {} }
+    }
+
     return {
       domain,
       lastChecked: new Date().toISOString(),
       repo: `https://github.com/drivly/${domain}`,
       text: `${ emoji } ${domain} passed ${passed_checks}/${ report.flat().length } checks`,
+      performance: Object.keys(api_spec.examples || {}).map(x => `https://time.series.do/api-qa-${domain}-${x}/embed?aggregate=avg&resolution=daily&range=30`),
       passed: report.flat().filter(x => x.result).map(x => x.test_name),
       problems: report.flat().filter(x => !x.result).reduce((acc, cur) => { acc[cur.test_name] = { result: cur.result, fix: cur.fix }; return acc }, {}),
+    }
+  }
+
+  async performance_test(domain) {
+    let api_spec
+
+    try {
+      api_spec = await fetch(
+        `https://${domain}/api`
+      ).then(res => res.json())
+    } catch (e) {
+      // This domain clearly isnt setup correctly, no point in trying to perf test.
+      return
+    }
+
+    const examples = api_spec.examples
+
+    // Return if there are no examples or if they are the template examples
+    // Examples is an object
+    if (!Object.values(examples || {}).length) {
+      console.log('No examples found.', domain)
+      return
+    }
+
+    if (Object.values(examples || {}).filter(x => x.includes('templates.do')).length) {
+      console.log('Only has template examples')
+      return
+    }
+
+    for (const [key, value] of Object.entries(examples)) {
+      const results = await fetch(
+        `https://perf.do/${value.replace('https://', '')}`
+      ).then(res => res.json())
+
+      await this.log(
+        `[PERF] ${key} : ${results.perf.avg}`
+      )
+
+      await fetch(
+        `https://time.series.do/api-qa-${domain}-${key}/write?value=${results.perf.avg}`
+      )
     }
   }
 
@@ -210,7 +262,12 @@ export class ScannerDurable {
       // Get latest report
       let report = await this.state.storage.get(`${this.current_date()}:report`)
 
-      if (!report) {
+      if (!await this.state.storage.get(`domain`)) {
+        console.log('SETTING DOMAIN IN STORAGE.')
+        await this.state.storage.put(`domain`, segments[0])
+      }
+
+      if (!report || url.searchParams.get('force') == '1') {
         // Now we need to run for this date.
         report = await this.generate_report(segments[0])
 
@@ -219,7 +276,19 @@ export class ScannerDurable {
         report = JSON.parse(report)
       }
 
+      if (!await this.state.storage.getAlarm()) {
+        await this.state.storage.setAlarm(
+          new Date(new Date().getTime() + Math.floor(Math.random() * 500000)), // Randomize the time so we dont all hit the API at the same time.
+        )
+      }
+
       return new Response(JSON.stringify(report))
+    }
+
+    if (segments[1] == 'perf') {
+      await this.performance_test(
+        segments[0]
+      )
     }
 
     if (segments[1] == 'purge') {
@@ -232,6 +301,17 @@ export class ScannerDurable {
   }
 
   async alarm() {
-    
+    // Run every 24 hours.
+    await this.state.storage.setAlarm(
+      new Date(Date.now() + 1000 * 60 * 60 * 24)
+    )
+
+    const domain = await this.state.storage.get(`domain`)
+
+    const report = await this.generate_report(domain)
+
+    await this.state.storage.put(`${this.current_date()}:report`, JSON.stringify(report))
+
+    await this.performance_test(domain)
   }
 }

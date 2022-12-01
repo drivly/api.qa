@@ -41,7 +41,7 @@ export default {
 
       const scanner = await env.ScannerDurable.get(env.ScannerDurable.idFromName(pathSegments[1]))
 
-      const report = await scanner.fetch(`https://x.do/${pathSegments[1]}/report`).then(res => res.json())
+      const report = await scanner.fetch(`https://x.do/${pathSegments[1]}/report?force=${query.force}`).then(res => res.json())
 
       return json({
         api,
