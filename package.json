@@ -3,8 +3,11 @@
   "version": "1.0.0",
   "description": "This is a template and package for automated API testing by using the hypermedia references in an APIs.json file to discover an API's functionality and recursively iterate through testing all of the endpoints to ensure expected and consistent behavior.",
   "main": "worker.js",
+  "module": "./dist/index.mjs",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "esbuild ./src/worker.js --bundle --format=esm --outfile=dist/index.mjs  --loader:.html=text --define:process.env.HMAC_SECRET=\"'$( echo $HMAC_SECRET )'\"",
+    "dev": "export $(cat .env | xargs) && npx miniflare@latest --watch",
+    "format": "prettier --write '**/*.{js,css,json,md}'"
   },
   "repository": {
     "type": "git",
@@ -15,5 +18,8 @@
   "bugs": {
     "url": "https://github.com/drivly/api.qa/issues"
   },
-  "homepage": "https://github.com/drivly/api.qa#readme"
+  "homepage": "https://github.com/drivly/api.qa#readme",
+  "dependencies": {
+    "esbuild": "^0.15.16"
+  }
 }

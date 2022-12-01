@@ -1,9 +1,32 @@
 name = "api-qa"
 # route = { pattern = "*/*", zone_name = "api.qa" }
-main = "worker.js"
+main = "./dist/index.mjs"
 compatibility_date = "2022-09-25"
 logpush = true
 
 services = [
   { binding = "CTX", service = "ctx-do", environment = "production" }
 ]
+
+[build]
+command = "npm run build"
+ 
+[build.upload]
+format = "modules"
+
+[durable_objects]
+bindings = [
+  { name = "ScannerDurable", class_name = "ScannerDurable"},
+]
+
+[[migrations]]
+tag = "v1" # Should be unique for each entry
+new_classes = ["ScannerDurable"]
+
+[miniflare]
+env_path = ".env"
+durable_objects_persist = "./data/"
+kv_persist = "./data/"
+
+[miniflare.mounts]
+ctx-do = "../ctx.do"
