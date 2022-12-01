@@ -76,13 +76,19 @@ export class ScannerDurable {
         // Test to see if there is a PUBLIC repo for this domain
         await this.log(`Validating if ${domain} has a public repo...`)
 
-        const check = await fetch(
-          `https://cdn.jsdelivr.net/gh/drivly/${domain}/wrangler.toml`
-        )
+        let exists
+        try {
+          exists = await Promise.all([
+            fetch(`https://cdn.jsdelivr.net/gh/drivly/${domain}/wrangler.toml`),
+            fetch(`https://cdn.jsdelivr.net/gh/drivly/${domain}/README.md`),
+          ])
+        } catch (e) {
+          exists = []
+        }
 
         return {
           test_name: 'publicRepo',
-          result: check.status == 200,
+          result: exists.length && exists.some(e => e.status == 200),
           fix: 'https://github.com/drivly/worker.templates.do/generate'
         }
       },
@@ -141,11 +147,11 @@ export class ScannerDurable {
           ).then(res => res.json())
         } catch (e) {
           check = { error: e }
-        }  
+        }
 
         return {
           test_name: 'apiDescription',
-          result: !(check?.api?.description || '').includes('Template'),
+          result: (check?.api?.description || '') && !(check?.api?.description || '').includes('Template'),
           fix: `https://github.com/drivly/${domain}/blob/main/worker.js`
         }
       },
@@ -163,7 +169,7 @@ export class ScannerDurable {
             }
           )
         } catch (e) {
-          check = ''
+          check = new Response(null, { headers: { Location: 'error' }, status: 400 })
         }
         
         return {
