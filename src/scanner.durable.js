@@ -151,7 +151,7 @@ export class ScannerDurable {
 
         return {
           test_name: 'apiDescription',
-          result: (check?.api?.description || '') && !(check?.api?.description || '').includes('Template'),
+          result: !!(check?.api?.description || '') && !(check?.api?.description || '').includes('Template'),
           fix: `https://github.com/drivly/${domain}/blob/main/worker.js`
         }
       },
