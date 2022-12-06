@@ -45,11 +45,13 @@ export class ScannerDurable {
           {
             test_name: 'domainActive',
             result: check.Status == 0,
+            error: 'Domain is not currently active.',
             fix: `https://dash.cloudflare.com/b6641681fe423910342b9ffa1364c76d/add-site`
           },
           {
             test_name: 'nameserversValid',
             result: ns_check.Status == 0 && ns_check.Answer.every(a => a.data.includes('cloudflare.com')),
+            error: 'Domain is not on the Cloudflare network.',
             fix: `https://dash.cloudflare.com/b6641681fe423910342b9ffa1364c76d/add-site`
           }
         ]
@@ -69,7 +71,7 @@ export class ScannerDurable {
         const days = diff / (1000 * 60 * 60 * 24)
 
         return [
-          { test_name: 'domainExpiration', result: days > 30 }
+          { test_name: 'domainExpiration', result: days > 30, error: 'Domain is about to expire.' }
         ]
       },
       async () => {
@@ -107,6 +109,7 @@ export class ScannerDurable {
         return {
           test_name: 'roadmapExists',
           result: (check?.title || '').toLowerCase() == 'roadmap',
+          error: 'A roadmap issue does not exist in the repo.',
           fix: `https://github.com/drivly/${domain}/issues/new?assignees=&labels=roadmap&title=Roadmap`
         }
       },
@@ -129,6 +132,7 @@ export class ScannerDurable {
         return {
           test_name: 'landingPage',
           result: check.includes('<html') && r.status == 200,
+          error: 'This domain has no landing page. It did not return a 200 status code and HTML for the root page.',
           fix: [
             `https://github.com/drivly/${domain}/new/main?filename=CNAME&value=${domain}`,
             `https://github.com/drivly/${domain}/new/main?filename=_config.yaml&value=remote_theme%3A%20drivly%2Fdocs%0Aicon%3A%20%F0%9F%9A%80`
@@ -152,6 +156,7 @@ export class ScannerDurable {
         return {
           test_name: 'apiDescription',
           result: !!(check?.api?.description || '') && !(check?.api?.description || '').includes('Template'),
+          error: 'This domain did not return an API description in its API header, or it doesnt have an API header.',
           fix: `https://github.com/drivly/${domain}/blob/main/worker.js`
         }
       },
@@ -175,12 +180,99 @@ export class ScannerDurable {
         return {
           test_name: 'loginRedirect',
           result: (check.headers.get('Location') || '').includes('oauth.do'),
+          error: 'This domain did not redirect to the OAuth login page when visiting /login.',
           fix: `https://dash.cloudflare.com/b6641681fe423910342b9ffa1364c76d/${domain}/workers`
         }
       }
     ]
 
     const report = await Promise.all(checks.map(x => x()))
+
+    // Check if this domain has any custom tests we need to run.
+    let api_spec
+
+    try {
+      api_spec = await fetch(
+        `https://${domain}/api`
+      ).then(res => res.json())
+    } catch (e) {
+      api_spec = { examples: {} }
+    }
+
+    let custom_report = {}
+
+    if (Object.keys(api_spec?.tests || {}).length) {
+      await this.log(`Running custom tests for ${domain}`)
+
+      const custom_tests = Object.keys(api_spec.tests).map(async (test) => {
+        const test_name = test
+        const test_url = api_spec.tests[test]
+
+        await this.log(`Running custom test ${test_name} for ${domain}`)
+
+        let num_passes = 0
+        let num_tests = typeof test_url == 'string' ? 1 : test_url.length // Test URL is either a string or an array of URLs to test.
+
+        let messages = []
+
+        for (let i = 0; i < num_tests; i++) {
+          let check
+
+          const u = typeof test_url == 'string' ? test_url : test_url[i]
+
+          console.log('Executing URL', u)
+
+          try {
+            check = await fetch(
+              u.replace('status==200', 'status==201')
+            ).then(res => res.json())
+          } catch (e) {
+            check = { error: e }
+          }
+
+          if (u.includes('tests.do')) {
+            // We're testing the tests.do API
+            if (!check.data.success) {
+              return {
+                test_name,
+                result: false,
+                error: check.data.error,
+                fix: `https://${domain}/api`
+              }
+            }
+
+            if (check.data.result == 'passed') {
+              num_passes++
+            } else {
+              console.log(check.data)
+              messages.push({ url: u, 'results': check.data.results })
+            }
+          } else {
+            num_passes++ // This domain isnt for testing, so we auto pass.
+          }
+        }
+
+        if (num_passes == num_tests) {
+          return {
+            test_name,
+            result: true,
+            fix: `https://api.qa/api/${domain}/tests/${test_name}/report`
+          }
+        } else {
+          return {
+            test_name,
+            result: false,
+            error: `This domain failed ${num_tests - num_passes} of ${num_tests} tests. See the report for more details.`,
+            fix: `https://api.qa/api/${domain}/tests/${test_name}/report`
+          }
+        }
+      })
+
+      custom_report = await Promise.all(custom_tests)
+
+      report.push(custom_report)
+    }
+
     // turn array of objects into one object
     const report_obj = report.flat().reduce((acc, cur) => { acc[cur.test_name] = cur.result; return acc }, {})
 
@@ -192,24 +284,14 @@ export class ScannerDurable {
 
     const emoji = passed_checks == report.flat().length ? '✅' : passed_checks > report.flat().length / 2 ? '🆗' : '❌'
 
-    let api_spec
-
-    try {
-      api_spec = await fetch(
-        `https://${domain}/api`
-      ).then(res => res.json())
-    } catch (e) {
-      api_spec = { examples: {} }
-    }
-
     return {
       domain,
       lastChecked: new Date().toISOString(),
       repo: `https://github.com/drivly/${domain}`,
       text: `${ emoji } ${domain} passed ${passed_checks}/${ report.flat().length } checks`,
-      performance: Object.keys(api_spec.examples || {}).map(x => `https://time.series.do/api-qa-${domain}-${x}/embed?aggregate=avg&resolution=daily&range=30`),
+      performance: Object.keys(api_spec.examples || {}).map(x => ({ n: x, u: `https://time.series.do/api-qa-${domain}-${x}/embed?aggregate=avg&resolution=daily&range=30` })).reduce((acc, cur) => { acc[cur.n] = cur.u; return acc }, {}),
       passed: report.flat().filter(x => x.result).map(x => x.test_name),
-      problems: report.flat().filter(x => !x.result).reduce((acc, cur) => { acc[cur.test_name] = { result: cur.result, fix: cur.fix }; return acc }, {}),
+      problems: report.flat().filter(x => !x.result).reduce((acc, cur) => { acc[cur.test_name] = { error: cur.error, fix: cur.fix }; return acc }, {}),
     }
   }
 
