@@ -106,6 +106,11 @@ export class ScannerDurable {
           }
         ).then(res => res.json())
 
+        console.log(
+          'ROADMAP',
+          check.title
+        )
+
         return {
           test_name: 'roadmapExists',
           result: (check?.title || '').toLowerCase() == 'roadmap',
@@ -129,10 +134,6 @@ export class ScannerDurable {
           )
           r = new Response('', { status: 404, headers: { 'Content-Type': 'error/error' } })
         }
-
-        console.log(
-          (r.headers.get('Content-Type') || '').includes('html'), r.status == 200
-        )
         
         return {
           test_name: 'landingPage',
