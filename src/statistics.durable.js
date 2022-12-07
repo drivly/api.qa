@@ -51,6 +51,23 @@ export class StatisticsDurable {
         return b.passed_checks - a.passed_checks
       }).slice(parseInt(query.get('offset') || 0), parseInt(query.get('offset') || 0) + parseInt(query.get('limit') || 10))
 
+      
+      const filter = {
+        passed: item => item.passed_checks == item.total_checks,
+        any: item => true
+      }[query.get('filter') || 'passed']
+
+      list = list.filter(filter).map(item => {
+        const ret = {
+          ...item,
+          checks: `${item.passed_checks}/${item.total_checks}`
+        }
+
+        delete ret.passed_checks
+        delete ret.total_checks
+        return ret
+      })
+
       return new Response(JSON.stringify({
         total_passed: reports.filter(item => item.passed_checks == item.total_checks).length,
         total_failed: reports.filter(item => item.passed_checks != item.total_checks).length,

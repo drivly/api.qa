@@ -103,19 +103,20 @@ export default {
 
     if (pathSegments[1] == 'list') {
       const offset = parseInt(query.offset) || 0
-
       const limit = parseInt(query.limit) || 50
+      const filter = query.filter || 'passed'
 
       const list = await (
         env.StatisticsDurable.get(env.StatisticsDurable.idFromName('main'))
       ).fetch(
-        `https://x.do/${ new Date().toISOString().split('T')[0] }?offset=${offset}&limit=${limit}`
+        `https://x.do/${ new Date().toISOString().split('T')[0] }?offset=${offset}&limit=${limit}&filter=${filter}`
       ).then(res => res.json())
 
       return json({
         api,
         data: {
-          next: `https://${hostname}/api/list?offset=${offset + limit}&limit=${limit}`,
+          next: `https://${hostname}/api/list?offset=${offset + limit}&limit=${limit}&filter=${filter}`,
+          allServices: `https://${hostname}/api/list?offset=${offset + limit}&limit=${limit}&filter=any`,
           ...list,
         },
         user

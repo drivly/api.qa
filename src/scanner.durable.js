@@ -126,12 +126,12 @@ export class ScannerDurable {
 
           check = await check.text()
         } catch (e) {
-          check = '{}'
+          r = new Response('', { status: 404, headers: { 'Content-Type': 'error/error' } })
         }
         
         return {
           test_name: 'landingPage',
-          result: check.includes('<html') && r.status == 200,
+          result: (r.headers.get('Content-Type') || '').includes('html') && r.status == 200,
           error: 'This domain has no landing page. It did not return a 200 status code and HTML for the root page.',
           fix: [
             `https://github.com/drivly/${domain}/new/main?filename=CNAME&value=${domain}`,
@@ -222,7 +222,7 @@ export class ScannerDurable {
 
           try {
             check = await fetch(
-              u.replace('status==200', 'status==201')
+              u
             ).then(res => res.json())
           } catch (e) {
             check = { error: e }
