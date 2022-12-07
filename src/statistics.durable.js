@@ -19,7 +19,6 @@ export class StatisticsDurable {
 	async fetch(req) {
     // This durable object will be in charge of storing the collective reports from all of the DOs.
     // It will also be in charge of aggregating the data and returning it to the user.
-
     const query = new URL(req.url).searchParams
 
     if (req.method == 'POST') {
@@ -30,6 +29,13 @@ export class StatisticsDurable {
       await this.state.storage.put(`${new Date().toISOString().split('T')[0]}:${data.domain}`, JSON.stringify({
         ... data
       }))
+
+      // Replace / add to the report cache
+      const dt = new Date().toISOString().split('T')[0]
+      if (this.reports[dt]) {
+        this.reports[dt] = this.reports[dt].filter(item => item.domain != data.domain)
+        this.reports[dt].push(data)
+      }
       
       return new Response('OK')
     } else {
