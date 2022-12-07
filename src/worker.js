@@ -1,4 +1,5 @@
 export { ScannerDurable } from './scanner.durable.js'
+export { StatisticsDurable } from './statistics.durable.js'
 
 export const api = {
   icon: '⚡️',
@@ -61,7 +62,7 @@ export default {
       const limit = parseInt(query.limit) || 50
 
       const get_report = async (domain) => {
-        const scanner = await env.ScannerDurable.get(env.ScannerDurable.idFromName(domain))
+        const scanner = await env.ScannerDurable.get(env.ScannerDurable.idFromName(domain)) 
 
         const report = await scanner.fetch(`https://x.do/${domain}/purge`)
 
@@ -76,33 +77,46 @@ export default {
       })
     }
 
-    if (pathSegments[1] == 'list') {
+    if (pathSegments[1] == 'spawn') {
       const domain_list = await fetch('https://cdn.jsdelivr.net/gh/drivly/apis.do/_data/domains.csv').then(res => res.text())
 
       // Parse CSV
-      const domains = domain_list.split('\n').filter(x => !!x)
+      let domains = domain_list.split('\n').filter(x => !!x)
 
-      const offset = parseInt(query.offset) || 0
-      const limit = parseInt(query.limit) || 50
-      const search = query.search || ''
-      const simple = !!(query.simple || false)
+      if (!hostname.includes('api.qa')) domains = domains.slice(0, 50)
 
       const get_report = async (domain) => {
-        const scanner = await env.ScannerDurable.get(env.ScannerDurable.idFromName(domain))
+        const scanner = await env.ScannerDurable.get(env.ScannerDurable.idFromName(domain)) 
 
-        const report = await scanner.fetch(`https://x.do/${domain}/report`).then(res => res.json())
+        const report = await scanner.fetch(`https://x.do/${domain}/spawn`)
 
-        report.link = `https://${hostname}/api/${domain}/report`
-
-        return simple ? report.text : report
+        return [ domain, await report.text() ]
       }
 
       return json({
         api,
         data: {
-          next: `https://${hostname}/api/list?offset=${offset + limit}&limit=${limit}&search=${search}`,
-          totalDomains: domains.filter(x => x.includes(search)).length,
-          domains: await Promise.all(domains.filter(x => x.includes(search)).slice(offset, offset + limit).map(get_report)),
+          domains: await Promise.all(domains.map(get_report)),
+        },
+      })
+    }
+
+    if (pathSegments[1] == 'list') {
+      const offset = parseInt(query.offset) || 0
+
+      const limit = parseInt(query.limit) || 50
+
+      const list = await (
+        env.StatisticsDurable.get(env.StatisticsDurable.idFromName('main'))
+      ).fetch(
+        `https://x.do/${ new Date().toISOString().split('T')[0] }?offset=${offset}&limit=${limit}`
+      ).then(res => res.json())
+
+      return json({
+        api,
+        data: {
+          next: `https://${hostname}/api/list?offset=${offset + limit}&limit=${limit}`,
+          ...list,
         },
         user
       })

@@ -17,11 +17,16 @@ format = "modules"
 [durable_objects]
 bindings = [
   { name = "ScannerDurable", class_name = "ScannerDurable"},
+  { name = "StatisticsDurable", class_name = "StatisticsDurable"},
 ]
 
 [[migrations]]
 tag = "v1" # Should be unique for each entry
 new_classes = ["ScannerDurable"]
+
+[[migrations]]
+tag = "v2"
+new_classes = ["StatisticsDurable"]
 
 [miniflare]
 env_path = ".env"

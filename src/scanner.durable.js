@@ -220,8 +220,6 @@ export class ScannerDurable {
 
           const u = typeof test_url == 'string' ? test_url : test_url[i]
 
-          console.log('Executing URL', u)
-
           try {
             check = await fetch(
               u.replace('status==200', 'status==201')
@@ -244,7 +242,6 @@ export class ScannerDurable {
             if (check.data.result == 'passed') {
               num_passes++
             } else {
-              console.log(check.data)
               messages.push({ url: u, 'results': check.data.results })
             }
           } else {
@@ -283,6 +280,25 @@ export class ScannerDurable {
     // If it fails more than half, we put a ❌ emoji
 
     const emoji = passed_checks == report.flat().length ? '✅' : passed_checks > report.flat().length / 2 ? '🆗' : '❌'
+
+    const statistics_durable = this.env.StatisticsDurable.get(this.env.StatisticsDurable.idFromName('main'))
+
+    await statistics_durable.fetch(
+      `https://api.qa/`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          domain,
+          text: `${ emoji } ${domain} passed ${passed_checks}/${ report.flat().length } checks`,
+          url: `https://api.qa/api/${domain}/report?date=${this.current_date()}`,
+          report: report_obj,
+          passed_checks,
+          total_checks: report.flat().length,
+          emoji
+        })
+      }
+    )
 
     return {
       domain,
@@ -358,11 +374,7 @@ export class ScannerDurable {
         report = JSON.parse(report)
       }
 
-      if (!await this.state.storage.getAlarm()) {
-        await this.state.storage.setAlarm(
-          new Date(new Date().getTime() + Math.floor(Math.random() * 500000)), // Randomize the time so we dont all hit the API at the same time.
-        )
-      }
+
 
       return new Response(JSON.stringify(report))
     }
@@ -377,6 +389,25 @@ export class ScannerDurable {
       await this.state.storage.delete(`${this.current_date()}:report`)
 
       return new Response('ok')
+    }
+
+    if (segments[1] == 'spawn') {
+      // We need to setup the alarm to run at midnight everyday.
+      await this.state.storage.deleteAlarm()
+      await this.state.storage.setAlarm(
+        new Date(new Date(Date.now() + 1000 * 60 * 60 * 24).setHours(0, 0, 0, 0))
+      )
+
+      await this.state.storage.put(`domain`, segments[0])
+
+      // Run the reporting process right now.
+      if (!await this.state.storage.get(`${this.current_date()}:report`)) {
+        await this.state.storage.put(`${this.current_date()}:report`, JSON.stringify(
+          await this.generate_report(segments[0])
+        ))
+      }
+
+      return new Response('OK')
     }
 
     return new Response('woof')
