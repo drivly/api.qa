@@ -123,8 +123,6 @@ export class ScannerDurable {
           r = await fetch(
             `https://${domain}/`
           )
-
-          check = await check.text()
         } catch (e) {
           console.log(
             'Error fetching root page for', domain, e
