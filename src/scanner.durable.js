@@ -126,6 +126,9 @@ export class ScannerDurable {
 
           check = await check.text()
         } catch (e) {
+          console.log(
+            'Error fetching root page for', domain, e
+          )
           r = new Response('', { status: 404, headers: { 'Content-Type': 'error/error' } })
         }
         
