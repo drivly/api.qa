@@ -35,7 +35,7 @@ export default {
 	  const { user, origin, hostname, requestId, method, body, time, pathname, pathSegments, pathOptions, url, query } = await env.CTX.fetch(req).then(res => res.json())
 	  const json=(e,t)=>(ctx.waitUntil(fetch(`https://debug.do/ingest/${req.headers.get("CF-Ray")}`,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({request:{url:req.url,method:req.method,headers:Object.fromEntries(req.headers),query:Object.fromEntries(new URL(req.url).searchParams)},response:e,user,status: t?.status || 200})})),new Response(JSON.stringify(e,null,2),{headers:{"content-type":"application/json; charset=utf-8","Access-Control-Allow-Origin":"*","Access-Control-Allow-Methods":"GET, POST, PUT, DELETE, OPTIONS","Access-Control-Allow-Headers":"Content-Type, Authorization, X-Requested-With","Cache-Control":"no-cache, no-store, must-revalidate"},...t}))
 	  
-	  if (pathname == '/api') return new Response(JSON.stringify({ api, gettingStarted, examples, user }, null, 2), { headers: { 'content-type': 'application/json; charset=utf-8' }})
+	  //if (pathname == '/api') return new Response(JSON.stringify({ api, gettingStarted, examples, user }, null, 2), { headers: { 'content-type': 'application/json; charset=utf-8' }})
 
     if (pathSegments[2] == 'report') {
       // Fetch the latest report from the underlying DurableObject
@@ -101,29 +101,25 @@ export default {
       })
     }
 
-    if (pathSegments[1] == 'list') {
-      const offset = parseInt(query.offset) || 0
-      const limit = parseInt(query.limit) || 50
-      const filter = query.filter || 'passed'
+    const offset = parseInt(query.offset) || 0
+    const limit = parseInt(query.limit) || 50
+    const filter = query.filter || 'passed'
 
-      const list = await (
-        env.StatisticsDurable.get(env.StatisticsDurable.idFromName('main'))
-      ).fetch(
-        `https://x.do/${ new Date().toISOString().split('T')[0] }?offset=${offset}&limit=${limit}&filter=${filter}`
-      ).then(res => res.json())
+    const list = await (
+      env.StatisticsDurable.get(env.StatisticsDurable.idFromName('main'))
+    ).fetch(
+      `https://x.do/${ new Date().toISOString().split('T')[0] }?offset=${offset}&limit=${limit}&filter=${filter}`
+    ).then(res => res.json())
 
-      return json({
-        api,
-        data: {
-          next: `https://${hostname}/api/list?offset=${offset + limit}&limit=${limit}&filter=${filter}`,
-          allServices: `https://${hostname}/api/list?offset=${offset + limit}&limit=${limit}&filter=any`,
-          ...list,
-        },
-        user
-      })
-    }
-
-	  return new Response(JSON.stringify(output, null, 2), { headers: { 'content-type': 'application/json; charset=utf-8' }})
+    return json({
+      api,
+      data: {
+        next: `https://${hostname}/api/list?offset=${offset + limit}&limit=${limit}&filter=${filter}`,
+        allServices: `https://${hostname}/api/list?offset=${offset + limit}&limit=${limit}&filter=any`,
+        ...list,
+      },
+      user
+    })
 	},
 }
   
